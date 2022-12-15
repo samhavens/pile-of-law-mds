@@ -126,6 +126,8 @@ def file_to_dir(args: Tuple[str, str, str, List[str], int]) -> Dict[str, int]:
     with MDSWriter(out_dir, columns, compression, hashes, size_limit) as out:
         for line in lzma.open(open(in_file, 'rb'), 'rt', encoding='utf-8'):
             obj = json.loads(line)
+            if obj is None:
+                continue
             pol_set_name = out_dir.split(os.path.sep)[-1]
             if pol_set_name[-1].isnumeric():
                 # mostly the file name is the set name, but when there is more than one shard per set
