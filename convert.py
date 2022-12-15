@@ -3,12 +3,14 @@
 
 """Convert the Pile of Law dataset to streaming format.
 
+Based on the Mosiac Streaming example of converting The Pile
+
     Instructions:
 Download the Pile of Law dataset (cf https://huggingface.co/datasets/pile-of-law/pile-of-law/tree/main/data)
 or by using HuggingFace datasets.
 That will result in this directory structure:
     TODO fill in this directory structure
-    dir/
+    data/
         train.*.jsonl.xz
         validation.*.jsonl.xz
 
