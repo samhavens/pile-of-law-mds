@@ -84,8 +84,6 @@ if __name__ == "__main__":
     args = parse_args()
     download_dir = args.download_dir
     max_concurrency = args.max_concurrency
-    if max_concurrency == -1:
-        max_concurrency = len(URLS)
 
     os.makedirs(download_dir, exist_ok=True)
 
@@ -98,6 +96,9 @@ if __name__ == "__main__":
         print(f"you might want to kill this process, delete {download_dir} and start again with a higher timeout")
     else:
         urls = URLS
+
+    if max_concurrency == -1:
+        max_concurrency = len(urls)
 
     print("downloading Pile of Law. Depending on your internet connection, this may take a few hours... or a few minutes.")
     results = asyncio.run(download_all_files(urls, download_dir, max_concurrency=max_concurrency))
