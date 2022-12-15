@@ -1,3 +1,4 @@
 aiohttp==3.8.3
+awscli==1.27.30
 omegaconf==2.3.0
 mosaicml-streaming==0.2.0
