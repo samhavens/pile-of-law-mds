@@ -20,7 +20,7 @@ and no test file
 You then run this script specifying --in_root (the above dir), --out_root (the dir to create),
 and any other flags as appropriate, e.g.
 
-python convert.py --in_root $(pwd)/data --out_root $(pwd)/mds-pol
+python convert.py --in_root $(pwd)/data --out_root $(pwd)/mds-pol --train_only
 """
 
 import json
@@ -79,6 +79,17 @@ def parse_args() -> Namespace:
         type=int,
         default=None,
         help='Number of processes to use, defaults to all available cores',
+    )
+    args.add_argument(
+        '--validation_only',
+        action='store_true',
+        help='If set, only process the validation split',
+    )
+    # Source dataset has errors and currently val is broken
+    args.add_argument(
+        '--train_only',
+        action='store_true',
+        help='If set, only process the train split',
     )
     return args.parse_args()
 
@@ -212,7 +223,12 @@ def main(args: Namespace) -> None:
     trains = sorted(glob(train_pattern))
     validation_pattern = os.path.join(args.in_root, 'validation.*.jsonl.xz')
     validations = sorted(glob(validation_pattern))
-    in_files = trains + validations
+    if args.validation_only:
+        in_files = validations
+    elif args.train_only:
+        in_files = trains
+    else:
+        in_files = trains + validations
 
     # Get the arguments for each JSONL file conversion.
     arg_tuples = each_task(args.in_root, args.out_root, args.compression, hashes, args.size_limit,
@@ -229,12 +245,15 @@ def main(args: Namespace) -> None:
             print(json.dumps(obj, sort_keys=True))
 
     # Merge shard groups.
-    train_root = os.path.join(args.out_root, 'train')
-    merge_shard_groups(train_root)
+    if (not args.validation_only) or args.train_only:
+        train_root = os.path.join(args.out_root, 'train')
+        merge_shard_groups(train_root)
 
-    validation_root = os.path.join(args.out_root, 'validation')
-    merge_shard_groups(validation_root)
+    if (not args.train_only) or args.validation_only:
+        validation_root = os.path.join(args.out_root, 'validation')
+        merge_shard_groups(validation_root)
 
 
 if __name__ == '__main__':
     main(parse_args())
+

@@ -29,6 +29,21 @@ def parse_args() -> Namespace:
         default=8,
         help='Number of simultaneous downloads, defaults to 8. Set to -1 to download all simultaneously (untested)',
     )
+    args.add_argument(
+        '--validation_only',
+        action='store_true',
+        help='If set, only process the validation split',
+    )
+    args.add_argument(
+        '--train_only',
+        action='store_true',
+        help='If set, only process the train split',
+    )
+    args.add_argument(
+        '--resume',
+        action='store_true',
+        help='If set, resume a failed download. WARNING - this may not work as expected',
+    )
     return args.parse_args()
 
 
@@ -73,29 +88,41 @@ def resume_urls(all_urls: List[str], downloaded_file_names: List[str]):
     still_to_fetch = [f for f in remote_fnames if f not in downloaded_no_prefix]
     return still_to_fetch
 
+
 if __name__ == "__main__":
+    args = parse_args()
+    download_dir = args.download_dir
+    max_concurrency = args.max_concurrency
+    train_only = args.train_only
+    validation_only = args.validation_only
+
+    os.makedirs(download_dir, exist_ok=True)
+
     # get all file URLs
     URLS = []
     for subset, splits in DATA_URL.items():
         for split, urls in splits.items():
             for url in urls:
                 URLS.append(url)
-    # handle args
-    args = parse_args()
-    download_dir = args.download_dir
-    max_concurrency = args.max_concurrency
 
-    os.makedirs(download_dir, exist_ok=True)
-
-    # if we are resuming, there will be files in the download_dir
-    downloaded_files = glob.glob(os.path.join(download_dir, "*.jsonl.xz"))
-    if len(downloaded_files):
-        urls = resume_urls(URLS, downloaded_files)
-        print(f"resuming download. found {len(urls)} remaining files")
-        print("note that if a file download was interrupted, this may result in an incomplete version of that file")
-        print(f"you might want to kill this process, delete {download_dir} and start again with a higher timeout")
+    if args.resume:
+        # if we are resuming, there will be files in the download_dir
+        downloaded_files = glob.glob(os.path.join(download_dir, "*.jsonl.xz"))
+        if len(downloaded_files):
+            urls = resume_urls(URLS, downloaded_files)
+            print(f"resuming download. found {len(urls)} remaining files")
+            print("note that if a file download was interrupted, this may result in an incomplete version of that file")
+            print(f"you might want to kill this process, delete {download_dir} and start again with a higher timeout")
+        else:
+            print(f"you asked to resume a download but no downloaded files were found")
+            exit()
     else:
         urls = URLS
+
+    if train_only:
+        urls = [url for url in urls if "train" in url]
+    elif validation_only:
+        urls = [url for url in urls if "validation" in url]
 
     if max_concurrency == -1:
         max_concurrency = len(urls)
