@@ -1,9 +1,13 @@
 # Copyright 2022 MosaicML Streaming authors
 # SPDX-License-Identifier: Apache-2.0
 
-"""Convert the Pile of Law dataset to streaming format.
+"""WARNING: THIS DOES NOT WORK!
 
-Based on the Mosiac Streaming example of converting The Pile
+I AM LEAVING IT IN HERE FOR NOW TO SHARE IT AND FIGURE OUT WHAT WENT WRONG
+
+Convert the Pile of Law dataset to streaming format.
+
+Based on the Mosiac Streaming example of converting The Pile.
 
     Instructions:
 Download the Pile of Law dataset (cf https://huggingface.co/datasets/pile-of-law/pile-of-law/tree/main/data)
@@ -82,17 +86,6 @@ def parse_args() -> Namespace:
         type=int,
         default=None,
         help='Number of processes to use, defaults to all available cores',
-    )
-    args.add_argument(
-        '--validation_only',
-        action='store_true',
-        help='If set, only process the validation split',
-    )
-    # Source dataset has errors and currently val is broken
-    args.add_argument(
-        '--train_only',
-        action='store_true',
-        help='If set, only process the train split',
     )
     return args.parse_args()
 
@@ -227,20 +220,25 @@ def main(args: Namespace) -> None:
     trains = sorted(glob(train_pattern))
     validation_pattern = os.path.join(args.in_root, 'validation.*.jsonl.xz')
     validations = sorted(glob(validation_pattern))
-    if args.validation_only:
-        in_files = validations
-    elif args.train_only:
-        in_files = trains
-    else:
-        in_files = trains + validations
+
+    in_files = trains + validations
 
     # Get the arguments for each JSONL file conversion.
     arg_tuples = each_task(args.in_root, args.out_root, args.compression, hashes, args.size_limit,
                            in_files)
 
     # Process each JSONL file in parallel into directories of shards.
-    with Pool(processes=args.num_proc) as pool:
-        counters = pool.imap(file_to_dir, arg_tuples)
+    if args.num_proc and args.num_proc > 1:
+        with Pool(processes=args.num_proc) as pool:
+            counters = pool.imap(file_to_dir, arg_tuples)
+            for in_file, counts in zip(in_files, counters):
+                obj = {
+                    'file': in_file,
+                    'counts': counts,
+                }
+                print(json.dumps(obj, sort_keys=True))
+    else:
+        counters = [file_to_dir(arg_tup) for arg_tup in arg_tuples]
         for in_file, counts in zip(in_files, counters):
             obj = {
                 'file': in_file,
@@ -249,13 +247,11 @@ def main(args: Namespace) -> None:
             print(json.dumps(obj, sort_keys=True))
 
     # Merge shard groups.
-    if (not args.validation_only) or args.train_only:
-        train_root = os.path.join(args.out_root, 'train')
-        merge_shard_groups(train_root)
+    train_root = os.path.join(args.out_root, 'train')
+    merge_shard_groups(train_root)
 
-    if (not args.train_only) or args.validation_only:
-        validation_root = os.path.join(args.out_root, 'validation')
-        merge_shard_groups(validation_root)
+    validation_root = os.path.join(args.out_root, 'validation')
+    merge_shard_groups(validation_root)
 
 
 if __name__ == '__main__':
