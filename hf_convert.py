@@ -1,7 +1,9 @@
 # Copyright 2022 MosaicML Streaming authors
 # SPDX-License-Identifier: Apache-2.0
 
-"""Convert the Pile of Law dataset to streaming format.
+"""Convert the Pile of Law dataset to streaming format. DOESN'T WORK YET.
+
+The idea is to take in the HF version of the dataset and convert it, in case something is going wrong upstream.
 
 Based on the Mosiac Streaming example of converting The Pile
 
@@ -20,9 +22,7 @@ and no test file
 You then run this script specifying --in_root (the above dir), --out_root (the dir to create),
 and any other flags as appropriate, e.g.
 
-python convert.py --in_root $(pwd)/data --out_root $(pwd)/mds-pol --train_only
-or
-python convert.py --in_root $(pwd)/data --out_root $(pwd)/mds-pol --num_proc 1
+python convert.py --out_root $(pwd)/mds-pol
 """
 
 import json
@@ -33,8 +33,8 @@ from collections import Counter
 from glob import glob
 from multiprocessing import Pool
 from typing import Dict, Iterator, List, Tuple
+import datasets
 
-import tqdm
 from streaming.base import MDSWriter
 from streaming.base.util import get_list_arg
 
@@ -46,12 +46,6 @@ def parse_args() -> Namespace:
     """
     args = ArgumentParser()
     args.add_argument(
-        '--in_root',
-        type=str,
-        required=True,
-        help='Directory path to store the input dataset',
-    )
-    args.add_argument(
         '--out_root',
         type=str,
         required=True,
@@ -60,7 +54,7 @@ def parse_args() -> Namespace:
     args.add_argument(
         '--compression',
         type=str,
-        default='zstd:7', # was 'zstd:16' switched to speed up
+        default='zstd:16',
         help='Compression algorithm to use. Empirically, Zstandard has the best performance in ' +
         'our benchmarks. Tune the compression level (from 1 to 22) to trade off time for ' +
         'quality. Default: zstd:16',
@@ -133,13 +127,12 @@ def file_to_dir(args: Tuple[str, str, str, List[str], int]) -> Dict[str, int]:
 
     columns = {
         'text': 'str',
-        'pol_set_name': 'str',
+        # 'pol_set_name': 'str', # can't get this in HF
     }
 
     counts = Counter()
     with MDSWriter(out_dir, columns, compression, hashes, size_limit) as out:
-        print(in_file)
-        for line in tqdm.tqdm(lzma.open(open(in_file, 'rb'), 'rt', encoding='utf-8')):
+        for line in lzma.open(open(in_file, 'rb'), 'rt', encoding='utf-8'):
             obj = json.loads(line)
             if obj is None:
                 continue
@@ -222,24 +215,17 @@ def main(args: Namespace) -> None:
     """
     hashes = get_list_arg(args.hashes)
 
-    # Find the original JSONL files to convert.
-    train_pattern = os.path.join(args.in_root, 'train.*.jsonl.xz')
-    trains = sorted(glob(train_pattern))
-    validation_pattern = os.path.join(args.in_root, 'validation.*.jsonl.xz')
-    validations = sorted(glob(validation_pattern))
-    if args.validation_only:
-        in_files = validations
-    elif args.train_only:
-        in_files = trains
-    else:
-        in_files = trains + validations
+    # this takes a long time the first time
+    ds = datasets.load_dataset("pile-of-law/pile-of-law", "all", cache_dir="hf_pol")
+    train_ds = ds['train']
+    validation_ds = ds['validation']
 
     # Get the arguments for each JSONL file conversion.
     arg_tuples = each_task(args.in_root, args.out_root, args.compression, hashes, args.size_limit,
                            in_files)
 
     # Process each JSONL file in parallel into directories of shards.
-    with Pool(processes=args.num_proc) as pool:
+    with Pool() as pool:
         counters = pool.imap(file_to_dir, arg_tuples)
         for in_file, counts in zip(in_files, counters):
             obj = {

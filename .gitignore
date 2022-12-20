@@ -1,6 +1,9 @@
 # data
 data/
 mds-pol/
+hf_pol/
+
+.vscode/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

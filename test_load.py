@@ -8,6 +8,7 @@ import sys
 from itertools import islice
 from typing import Any, Dict, Iterator, Optional
 
+import numpy as np
 import streaming as ms
 import transformers
 from omegaconf import DictConfig
@@ -20,8 +21,6 @@ class SimpleStreamingPileOfLaw(ms.StreamingDataset):
     Args:
         tokenizer_name (str): The name of the HuggingFace tokenizer to use to tokenize samples.
         max_seq_len (int): The max sequence length of each token sample.
-        group_method (str): How to group text samples into token samples. Currently only supporting
-            ``'truncate'``.
         local (str): Local dataset directory where shards are cached by split.
         remote (str, optional): Download shards from this remote path or directory. If None, this
             rank and worker's partition of the dataset must all exist locally. Defaults to
@@ -50,7 +49,6 @@ class SimpleStreamingPileOfLaw(ms.StreamingDataset):
     def __init__(self,
                  tokenizer_name: str,
                  max_seq_len: int,
-                 group_method: str,
                  local: str,
                  remote: Optional[str] = None,
                  split: Optional[str] = None,
@@ -63,15 +61,12 @@ class SimpleStreamingPileOfLaw(ms.StreamingDataset):
                  shuffle_seed: Optional[int] = None,
                  num_canonical_nodes: Optional[int] = None,
                  batch_size: Optional[int] = None) -> None:
-        if group_method not in ['truncate']:
-            raise ValueError(f'Only group_method="truncate" is supported at this time.')
 
         super().__init__(local, remote, split, shuffle, predownload, keep_zip, download_retry,
                          download_timeout, validate_hash, shuffle_seed, num_canonical_nodes,
                          batch_size)
         self.tokenizer_name = tokenizer_name
         self.max_seq_len = max_seq_len
-        self.group_method = group_method
 
         # Build tokenizer
         self.tokenizer = transformers.AutoTokenizer.from_pretrained(self.tokenizer_name)
@@ -84,18 +79,9 @@ class SimpleStreamingPileOfLaw(ms.StreamingDataset):
         Args:
             text_sample (Dict[str, Any]): Sample to tokenize.
         """
-        if self.group_method == 'truncate':
-            truncation = True
-            padding = 'max_length'
-            max_length = self.max_seq_len
-        else:
-            truncation = False
-            padding = False
-            max_length = None
         return self.tokenizer(text_sample['text'],
-                              truncation=truncation,
-                              padding=padding,
-                              max_length=max_length)
+                              truncation=False,
+                              padding=False)
 
     def __getitem__(self, idx: int) -> Any:
         """Get sample by global index, blocking to load its shard if missing.
@@ -106,7 +92,7 @@ class SimpleStreamingPileOfLaw(ms.StreamingDataset):
         """
         text_sample = super().__getitem__(idx)
         token_sample = self._tokenize(text_sample)
-        # Skip any token grouping, currently only supporting group_method='truncate'
+        # Skip any token grouping
         return token_sample
 
 
@@ -224,7 +210,7 @@ class StreamingPileOfLaw(ms.StreamingDataset):
     # If group_method=='truncate', we simply return the # samples.
     # If group_method=='concat', we repeat forever, and have no defined length.
     def __len__(self) -> Optional[int]:
-        if self.group_method == 'truncate':
+        if self.group_method in ['truncate']:
             return super().__len__()
         elif self.group_method == 'concat':
             return None
@@ -240,7 +226,6 @@ def build_pile_of_law_dataloader(cfg: DictConfig, device_batch_size: int):
                                  shuffle=cfg.dataset.shuffle,
                                  tokenizer_name=cfg.dataset.tokenizer_name,
                                  max_seq_len=cfg.dataset.max_seq_len,
-                                 group_method=cfg.dataset.group_method,
                                  batch_size=device_batch_size)
 
     collate_fn = transformers.DataCollatorForLanguageModeling(
@@ -267,37 +252,59 @@ if __name__ == '__main__':
         local = sys.argv[2]
     else:
         local = remote
-    print(f'Reading validation split from {remote} -> {local}')
 
     cfg = {
         'name': 'pile_of_law',
         'dataset': {
             'remote': remote,
             'local': local,
-            'split': 'validation',
+            'split': 'train',
             'shuffle': True,
             'prefetch': 1000,
             'tokenizer_name': 'gpt2',
-            'max_seq_len': 2048,
-            'group_method': 'truncate'  #'concat'
+            'max_seq_len': 256000,  # don't want to truncate for test, these are LONG
+            'group_method': 'none' # for length test
         },
         'drop_last': False,
-        'num_workers': 4,
+        'num_workers': 8,
         'pin_memory': True,
         'prefetch_factor': 2,
         'persistent_workers': True,
-        'timeout': 30,
+        'timeout': 1200,
     }
     cfg = om.create(cfg)
-    device_batch_size = 2
+    # set device batch size to 1, otherwise there will be padding!
+    device_batch_size = 1
+    
+    print(f'Reading {cfg.dataset.split} split from {remote} -> {local}')
 
     loader = build_pile_of_law_dataloader(cfg, device_batch_size)
     tokenizer = loader.dataset.tokenizer  # type: ignore
-    for batch_ix, batch in enumerate(islice(loader, 5)):
-        print('\n')
-        print('#' * 20, f'Batch {batch_ix}', '#' * 20)
-        for k, v in batch.items():
-            print(k, v.shape, v.dtype)
-        for sample_ix, token_sample in enumerate(batch['input_ids']):
-            print('-' * 20, f' Sample {sample_ix} ', '-' * 20)
-            print(tokenizer.decode(token_sample))
+    # for batch_ix, batch in enumerate(islice(loader, 5)):
+    #     print('\n')
+    #     print('#' * 20, f'Batch {batch_ix}', '#' * 20)
+    #     for k, v in batch.items():
+    #         print(k, v.shape, v.dtype)
+    #     for sample_ix, token_sample in enumerate(batch['input_ids']):
+    #         if sample_ix == 0:
+    #             print('-' * 20, f' Sample {sample_ix} ', '-' * 20)
+    #             print(tokenizer.decode(token_sample))
+
+    # get average token's per sample
+    token_lengths = []
+    print('\n')
+    for batch in islice(loader, 150_000):
+        for sample in batch['input_ids']:
+            token_lengths.append(len(sample))
+    mean = np.mean(token_lengths)
+    print('#' * 20, "Sequence Length distribution", '#' * 20)
+    print('#' * 20)
+    print(f"mean sample length: {mean}")
+    for percentile in [1, 5, 10, 30, 50, 75, 80, 90, 95, 99]:
+        print(f"p{percentile}: {np.percentile(token_lengths, percentile)}")
+    print('#' * 20)
+
+    print(f"{loader.dataset.index.total_samples} total samples")
+    print(f"mean sample length: {round(mean)} tokens")
+    print(f"{round(loader.dataset.index.total_samples * mean)} tokens")
+    exit() # need to run with torchrun and doesn't know to die
