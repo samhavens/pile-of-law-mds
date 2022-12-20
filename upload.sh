@@ -6,7 +6,8 @@ fi
 
 # Make sure there is an s3 bucket passed
 if (( $# != 1 )); then
-    >&2 echo "This script takes one argument; the s3 bucket URI"
+    echo 'This script takes one argument; the s3 bucket URI' >&2
+    exit 1
 fi
 
 # Set the path to the directory to upload
