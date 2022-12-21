@@ -80,7 +80,7 @@ class SentencesPileOfLaw(ms.StreamingDataset):
         doc = self.nlp(text_sample['text'])
         k = num_sents_from_len(doc.text)
         sents = [s.text for s in doc.sents if s.text.strip() != '']
-        sents = [s.resplace('\n', '\\n') for s in sents]  # there are so many newlines, preserve?
+        sents = [s.replace('\n', '\\n') for s in sents]  # there are so many newlines, preserve?
         # need to do that bc output format is newline separated strings
         sents = get_sents(sents=sents, k=k)
         return sents

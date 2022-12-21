@@ -2,6 +2,7 @@
 data/
 mds-pol/
 hf_pol/
+tokenize/pol_sentences.txt
 
 .vscode/
 
