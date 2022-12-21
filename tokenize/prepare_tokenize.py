@@ -12,11 +12,11 @@ mean sample length: 7019 tokens *3.5 = 24_566
 51987222437 tokens
 
 run with 
-torchrun
-    --rdzv_backend=c10d
-    --rdzv_endpoint=localhost:0
-    --nnodes=1
-    --nproc_per_node=1
+torchrun \
+    --rdzv_backend=c10d \
+    --rdzv_endpoint=localhost:0 \
+    --nnodes=1 \
+    --nproc_per_node=1 \
     prepare_tokenize.py ../mds-pol
 """
 
