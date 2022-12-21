@@ -20,8 +20,11 @@ torchrun \
     prepare_tokenize.py ../mds-pol
 """
 
+import itertools
 import random
+import shutil
 from typing import List, Optional
+from multiprocessing import Pool
 
 import spacy
 import tqdm
@@ -86,6 +89,27 @@ class SentencesPileOfLaw(ms.StreamingDataset):
         return sents
 
 
+def process_chunk(chunk, file_index):
+    with open(f'pol_sentences_{file_index}.txt', 'w') as f:
+        for sample in chunk:
+            for sentence in sample:
+                f.write(sentence + "\n")
+
+
+def chunkify(iterable, chunk_size):
+    iterator = iter(iterable)
+    while True:
+        chunk = []
+        try:
+            for _ in range(chunk_size):
+                chunk.append(next(iterator))
+            yield chunk
+        except StopIteration:
+            if chunk:
+                yield chunk
+            break
+
+
 def main():
     try:
         nlp = spacy.load('en_core_web_sm')
@@ -134,13 +158,18 @@ def main():
         batch_size=device_batch_size,
     )
 
-    with open('pol_sentences.txt', 'w') as f:
-        for sample in tqdm.tqdm(ds_train, total=7406292):
-            for sentence in sample:
-                f.write(sentence + "\n")
-        for sample in tqdm.tqdm(ds_validation, total=2466152):
-            for sentence in sample:
-                f.write(sentence + "\n")
+    chunks = chunkify(ds_train, chunk_size=7406292//64)
+
+    with Pool(64) as p:
+        for _ in tqdm(p.imap_unordered(process_chunk, chunks), total=len(chunks)):
+            pass
+
+    # Merge the files
+    with open('pol_sentences.txt', 'w') as outfile:
+        for i in range(64):
+            with open(f'pol_sentences_{i}.txt') as infile:
+                shutil.copyfileobj(infile, outfile)
+
 
 if __name__ == "__main__":
     main()
