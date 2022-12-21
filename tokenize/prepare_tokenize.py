@@ -21,7 +21,7 @@ torchrun \
 """
 
 import random
-from typing import Any, List, Optional
+from typing import List, Optional
 
 from omegaconf import OmegaConf
 
@@ -89,7 +89,7 @@ def main():
         nlp = spacy.load('en_core_web_sm')
     except OSError:
         # need model for sentence segmenting
-        print("run python -m spacy download en_core_web_sm")
+        print("MISSING SENTENCE SEGMENTING MODEL\n\nrun python -m spacy download en_core_web_sm\n\n")
         exit()
 
     remote = '../mds-pol'
