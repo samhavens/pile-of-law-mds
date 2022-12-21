@@ -11,4 +11,4 @@ This code downloads [The Pile of Law](https://huggingface.co/datasets/pile-of-la
 
 ## Alternate Path
 
-My first attempt at doing this was to use `download_pol.py` for step 1 and `convert.py` for step 2. These do not use the HuggingFace dataset library, and download the data directly, and convert it straight from the `jsonl.xz` files. This process does not work, and I am not sure why, but I think figuring it out would help for onboarding customers onto Streaming, since I tried to follow the example closely.
+My first attempt at doing this was to use `experiments/download_pol.py` for step 1 and `experiments/convert.py` for step 2. These do not use the HuggingFace dataset library, and download the data directly, and convert it straight from the `jsonl.xz` files. This process does not work, and I am not sure why, but I think figuring it out would help for onboarding customers onto Streaming, since I tried to follow the example closely.

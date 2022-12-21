@@ -7,7 +7,7 @@ from typing import List
 import aiohttp
 from tqdm.asyncio import tqdm_asyncio
 
-from pile_of_law_meta import DATA_URL
+from experiments.pile_of_law_meta import DATA_URL
 
 
 def parse_args() -> Namespace:
