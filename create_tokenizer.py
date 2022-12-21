@@ -2,11 +2,6 @@
 # sequences process at ~1000samples / sec, total of 1M => ~20min to preprocess at 1M samples
 # followed by unknown tokenization time
 
-# if you try to process the whole dataset, it exits with "killed"
-# (still plenty of memory according to htop, 64 cores 500GB ram)
-# during preprocessing
-# using 1M samples, it completes pre-processing, tokenizing, and Count Pairs, then exits with killed
-
 import datasets
 from transformers import AutoTokenizer
 
@@ -25,8 +20,7 @@ def main():
     dataset = ds['train'].shuffle(seed=42)
 
     # total_samples = len(dataset)
-    # total_samples = 1_000_000
-    total_samples = 500_000
+    total_samples = 1_000_000
 
     training_corpus = get_training_corpus(dataset, total_samples)
 
