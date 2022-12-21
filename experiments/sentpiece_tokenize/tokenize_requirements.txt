@@ -1,0 +1,2 @@
+mosaicml==0.11.1
+spacy==3.4.4
