@@ -128,3 +128,6 @@ def main():
         for sample in ds:
             for sentence in sample:
                 f.write(sentence + "\n")
+
+if __name__ == "__main__":
+    main()
