@@ -23,15 +23,10 @@ torchrun
 import random
 from typing import Any, List, Optional
 
+from omegaconf import OmegaConf
+
 import spacy
 import streaming as ms
-
-try:
-    spacy.load('en_core_web_sm')
-except OSError:
-    # need model for sentence segmenting
-    print("run python -m spacy download en_core_web_sm")
-    exit()
 
 
 p50 = 7882 
@@ -90,11 +85,20 @@ class SentencesPileOfLaw(ms.StreamingDataset):
 
 
 def main():
+    try:
+        nlp = spacy.load('en_core_web_sm')
+    except OSError:
+        # need model for sentence segmenting
+        print("run python -m spacy download en_core_web_sm")
+        exit()
+
+    remote = '../mds-pol'
+    local = '../mds-pol'
     cfg = {
         'name': 'pile_of_law',
         'dataset': {
-            'remote': '../mds-pol',
-            'local': '../mds-pol',
+            'remote': remote,
+            'local': local,
             'split': 'train',
             'shuffle': True,
             'prefetch': 1000,
@@ -106,4 +110,21 @@ def main():
         'persistent_workers': True,
         'timeout': 1200,
     }
-    cfg = om.create(cfg)
+    cfg = OmegaConf.create(cfg)
+    # check this
+    device_batch_size = 1
+    print(f'Reading {cfg.dataset.split} split from {remote} -> {local}')
+
+    ds = SentencesPileOfLaw(
+        nlp,
+        local=cfg.local,
+        remote=cfg.dataset.remote,
+        local=cfg.dataset.local,
+        shuffle=cfg.dataset.shuffle,
+        batch_size=device_batch_size,
+    )
+
+    with open('pol_sentences.txt', 'w') as f:
+        for sample in ds:
+            for sentence in sample:
+                f.write(sentence + "\n")
