@@ -119,7 +119,6 @@ def main():
         nlp,
         local=cfg.local,
         remote=cfg.dataset.remote,
-        local=cfg.dataset.local,
         shuffle=cfg.dataset.shuffle,
         batch_size=device_batch_size,
     )
