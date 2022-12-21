@@ -6,6 +6,7 @@ only have lengths in gpt2 tokens, estimate to get chars
 #################### Sequence Length distribution ####################
 p50: 2252 * 3.5 = 7882 
 p75: 5378 * 3.5 = 18_823
+p99: 77989 * 3.5 = 273_000
 
 7406292 total samples
 mean sample length: 7019 tokens *3.5 = 24_566
@@ -37,6 +38,7 @@ import streaming as ms
 
 p50 = 7882 
 p75 = 18_823
+p99 = 273_000
 
 
 def get_sents(sents: List[str], k:int) -> List[str]:
@@ -83,7 +85,10 @@ class SentencesPileOfLaw(ms.StreamingDataset):
             Any: Sample data.
         """
         text_sample = super().__getitem__(idx)
-        doc = self.nlp(text_sample['text'])
+        text = text_sample['text']
+        if len(text) > p99:
+            text = text[:p99 - 2]
+        doc = self.nlp(text)
         k = num_sents_from_len(doc.text)
         sents = [s.text for s in doc.sents if s.text.strip() != '']
         sents = [s.replace('\n', '\\n') for s in sents]  # there are so many newlines, preserve?
@@ -113,17 +118,7 @@ def chunkify(iterable, chunk_size):
             break
 
 
-def main():
-    try:
-        nlp = spacy.load('en_core_web_sm')
-    except OSError:
-        # need model for sentence segmenting
-        print("MISSING SENTENCE SEGMENTING MODEL\n\nrun:\npython -m spacy download en_core_web_sm\n\n")
-        exit()
-
-    # how much parallelism
-    PROCS = 64
-
+def get_ds_chunks(nlp, PROCS):
     remote = '../mds-pol'
     local = '../mds-pol'
     cfg = {
@@ -157,9 +152,27 @@ def main():
     )
 
     chunks = chunkify(ds_train, chunk_size=7406292//PROCS)
+    return chunks
+
+
+def main():
+    try:
+        nlp = spacy.load('en_core_web_sm', exclude=["ner"])
+    except OSError:
+        # need model for sentence segmenting
+        print("MISSING SENTENCE SEGMENTING MODEL\n\nrun:\npython -m spacy download en_core_web_sm\n\n")
+        exit()
+
+    # long segments
+    nlp.max_length = p99
+
+    # how much parallelism
+    PROCS = 64
+
+    chunks = get_ds_chunks(nlp, PROCS)
 
     with Pool(PROCS) as p:
-        for _ in tqdm(p.imap_unordered(process_chunk, chunks), total=len(chunks)):
+        for _ in tqdm.tqdm(p.imap_unordered(process_chunk, chunks), total=PROCS):
             pass
 
     # Merge the files
