@@ -1,5 +1,6 @@
 aiohttp==3.8.3
 awscli==1.27.30
 datasets==2.7.1
-omegaconf==2.3.0
 mosaicml-streaming==0.2.0
+omegaconf==2.3.0
+sentencepiece==0.1.97
