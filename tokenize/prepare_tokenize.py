@@ -23,9 +23,9 @@ torchrun \
 import random
 from typing import List, Optional
 
-from omegaconf import OmegaConf
-
 import spacy
+import tqdm
+from omegaconf import OmegaConf
 import streaming as ms
 
 
@@ -80,6 +80,8 @@ class SentencesPileOfLaw(ms.StreamingDataset):
         doc = self.nlp(text_sample['text'])
         k = num_sents_from_len(doc.text)
         sents = [s.text for s in doc.sents if s.text.strip() != '']
+        sents = [s.resplace('\n', '\\n') for s in sents]  # there are so many newlines, preserve?
+        # need to do that bc output format is newline separated strings
         sents = get_sents(sents=sents, k=k)
         return sents
 
@@ -115,9 +117,17 @@ def main():
     device_batch_size = 1
     print(f'Reading {cfg.dataset.split} split from {remote} -> {local}')
 
-    ds = SentencesPileOfLaw(
+    ds_train = SentencesPileOfLaw(
         nlp,
-        split=cfg.dataset.split,
+        split='train',
+        local=cfg.dataset.local,
+        remote=cfg.dataset.remote,
+        shuffle=cfg.dataset.shuffle,
+        batch_size=device_batch_size,
+    )
+    ds_validation = SentencesPileOfLaw(
+        nlp,
+        split='validation',
         local=cfg.dataset.local,
         remote=cfg.dataset.remote,
         shuffle=cfg.dataset.shuffle,
@@ -125,7 +135,10 @@ def main():
     )
 
     with open('pol_sentences.txt', 'w') as f:
-        for sample in ds:
+        for sample in tqdm.tqdm(ds_train, total=7406292):
+            for sentence in sample:
+                f.write(sentence + "\n")
+        for sample in tqdm.tqdm(ds_validation, total=2466152):
             for sentence in sample:
                 f.write(sentence + "\n")
 
