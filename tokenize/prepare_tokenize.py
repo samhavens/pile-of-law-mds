@@ -12,6 +12,10 @@ mean sample length: 7019 tokens *3.5 = 24_566
 51987222437 tokens
 
 run with 
+composer prepare_tokenize.py ../mds-pol
+
+or
+
 torchrun \
     --rdzv_backend=c10d \
     --rdzv_endpoint=localhost:0 \
@@ -20,7 +24,6 @@ torchrun \
     prepare_tokenize.py ../mds-pol
 """
 
-import itertools
 import random
 import shutil
 from typing import List, Optional
@@ -118,6 +121,9 @@ def main():
         print("MISSING SENTENCE SEGMENTING MODEL\n\nrun:\npython -m spacy download en_core_web_sm\n\n")
         exit()
 
+    # how much parallelism
+    PROCS = 64
+
     remote = '../mds-pol'
     local = '../mds-pol'
     cfg = {
@@ -149,24 +155,16 @@ def main():
         shuffle=cfg.dataset.shuffle,
         batch_size=device_batch_size,
     )
-    ds_validation = SentencesPileOfLaw(
-        nlp,
-        split='validation',
-        local=cfg.dataset.local,
-        remote=cfg.dataset.remote,
-        shuffle=cfg.dataset.shuffle,
-        batch_size=device_batch_size,
-    )
 
-    chunks = chunkify(ds_train, chunk_size=7406292//64)
+    chunks = chunkify(ds_train, chunk_size=7406292//PROCS)
 
-    with Pool(64) as p:
+    with Pool(PROCS) as p:
         for _ in tqdm(p.imap_unordered(process_chunk, chunks), total=len(chunks)):
             pass
 
     # Merge the files
     with open('pol_sentences.txt', 'w') as outfile:
-        for i in range(64):
+        for i in range(PROCS):
             with open(f'pol_sentences_{i}.txt') as infile:
                 shutil.copyfileobj(infile, outfile)
 
