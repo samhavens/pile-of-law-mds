@@ -89,7 +89,7 @@ def main():
         nlp = spacy.load('en_core_web_sm')
     except OSError:
         # need model for sentence segmenting
-        print("MISSING SENTENCE SEGMENTING MODEL\n\nrun python -m spacy download en_core_web_sm\n\n")
+        print("MISSING SENTENCE SEGMENTING MODEL\n\nrun:\npython -m spacy download en_core_web_sm\n\n")
         exit()
 
     remote = '../mds-pol'
@@ -117,7 +117,8 @@ def main():
 
     ds = SentencesPileOfLaw(
         nlp,
-        local=cfg.local,
+        split=cfg.dataset.split,
+        local=cfg.dataset.local,
         remote=cfg.dataset.remote,
         shuffle=cfg.dataset.shuffle,
         batch_size=device_batch_size,
