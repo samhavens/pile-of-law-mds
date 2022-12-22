@@ -54,7 +54,7 @@ class SimpleStreamingPileOfLaw(ms.StreamingDataset):
                  split: Optional[str] = None,
                  shuffle: bool = False,
                  predownload: Optional[int] = 100_000,
-                 keep_zip: Optional[bool] = None,
+                 keep_zip: Optional[bool] = True,
                  download_retry: int = 2,
                  download_timeout: float = 60,
                  validate_hash: Optional[str] = None,
@@ -275,7 +275,7 @@ if __name__ == '__main__':
     cfg = om.create(cfg)
     # set device batch size to 1, otherwise there will be padding!
     device_batch_size = 1
-    
+
     print(f'Reading {cfg.dataset.split} split from {remote} -> {local}')
 
     loader = build_pile_of_law_dataloader(cfg, device_batch_size)

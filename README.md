@@ -6,8 +6,11 @@ This code downloads [The Pile of Law](https://huggingface.co/datasets/pile-of-la
 
 1. `hf_download.py` to download the data locally, using the HuggingFace `datasets` wrapper
 2. `hf_convert.py` to convert the data to MDS format
-3. `test_load.py` to make sure that the resulting MDS file loads, as well as get estimated statistics of the tokenized dataset.
-4. Then the MDS folder, `mds-pol` by default, needs to be uploaded to S3. `upload.sh` will do this if you use the default folder names, and want to upload to the only bucket I have access to.
+3. `create_tokenizer.py` to create a custom tokenizer and upload to the HF Hub
+    a. This currently samples 1M segments from train, which takes ~90G of memory. If you have more memory, you can use more data
+4. `test_load.py` to make sure that the resulting MDS file loads, as well as get estimated statistics of the tokenized dataset.
+    a. This shouldn't modify your data, but make sure it is still compressed (ends in suffix .mds.zstd, not just .mds)
+5. Then the MDS folder, `mds-pol` by default, needs to be uploaded to S3. `upload.sh` will do this if you use the default folder names, and want to upload to the only bucket I have access to.
 
 ## Alternate Path
 
